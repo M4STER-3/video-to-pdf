@@ -42,6 +42,8 @@ export async function scanWindows(video, sampler, settings, threshold, signal, p
 
 export async function refineWindow(video, sampler, window, settings, threshold, signal) {
   const duration = window.end - window.start;
+  const minimumCandidate = Math.max(0.24, settings.stable * 0.75);
+  if (duration + 1e-6 < minimumCandidate) return null;
   const margin = Math.min(settings.settle, duration * 0.15);
   const from = window.start + margin, to = Math.max(from, window.end - Math.min(0.025, duration * 0.08));
   const times = [from, from + (to - from) * 0.25, (from + to) / 2, from + (to - from) * 0.75, to];

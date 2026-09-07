@@ -19,7 +19,7 @@ Une animation localisée en bordure n’interrompt pas immédiatement la pause. 
 
 ## Pourquoi 0,5 seconde ne signifie pas une capture périodique
 
-À huit observations par seconde, une pause réelle de 0,5 s couvre normalement plusieurs observations dont l’écart observé est plus court que la pause réelle. Le réglage recommandé exige 0,30 s de stabilité mesurée et réserve 0,06 s après mouvement. Les tests couvrent douze décalages de la pause par rapport à l’échantillonnage. Des pauses plus brèves peuvent rester candidates mais sont signalées.
+À huit observations par seconde, une pause réelle de 0,5 s couvre normalement plusieurs observations dont l’écart observé est plus court que la pause réelle. Le réglage recommandé exige 0,30 s de stabilité mesurée et réserve 0,06 s après mouvement. Un plancher de 0,24 s mesuré empêche les gels accidentels de devenir des pages. Les tests couvrent douze décalages de la pause par rapport à l’échantillonnage. Les pauses limites de 0,24 à 0,36 s peuvent rester candidates mais sont signalées.
 
 Cette configuration est un objectif de détection, pas une garantie pour tous les codecs, contenus, appareils ou mouvements. Une pause de dix secondes n’engendre pas vingt captures ; elle forme un intervalle dont une seule représentante est choisie. Des intervalles séparés montrant à nouveau le même contenu passent par la déduplication.
 

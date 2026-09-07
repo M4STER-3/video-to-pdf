@@ -8,7 +8,7 @@ Aucun navigateur n’a été piloté. Le skill `control-browser` impose un envir
 
 ## Résultats
 
-Les résultats nommés sont conservés dans `tests/results.json`. La suite du moteur couvre **34 tests**, complétés par **12 contrôles d’interactions simulées**.
+Les résultats nommés sont conservés dans `tests/results.json`. La suite du moteur couvre **35 tests**, complétés par **12 contrôles d’interactions simulées**.
 
 | Domaine | Vérification |
 | --- | --- |

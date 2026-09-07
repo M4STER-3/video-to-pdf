@@ -28,6 +28,10 @@
       "pass": true
     },
     {
+      "name": "Un gel de 0,18 s ne devient pas une page",
+      "pass": true
+    },
+    {
       "name": "Scroll continu rapide : aucune fenêtre stable",
       "pass": true
     },

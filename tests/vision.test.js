@@ -98,6 +98,11 @@ export async function runTests(onResult = () => {}) {
       assert(windows.some(x => x.start >= start && x.end < start + 0.5 && !x.short), `pause manquée, décalage ${offset}: ${JSON.stringify(windows)}`);
     }
   });
+  await test('Un gel de 0,18 s ne devient pas une page', () => {
+    const tracker = new WindowTracker(settings, 0.006);
+    for (let i = 0; i < 20; i++) tracker.add(i >= 5 && i <= 6 ? a : shifted(b, 0, -((i * 3) % 30)), i / 8);
+    assert(tracker.finish().every(x => x.end - x.start >= 0.24), 'gel trop court retenu');
+  });
   await test('Scroll continu rapide : aucune fenêtre stable', () => {
     const tracker = new WindowTracker(settings, 0.006);
     for (let i = 0; i < 35; i++) tracker.add(shifted(a, 0, -(i * 3 % 55)), i / 8);

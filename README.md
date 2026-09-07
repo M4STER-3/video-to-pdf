@@ -16,7 +16,7 @@ Pour l’ajouter à l’iPad : **Partager → Sur l’écran d’accueil → Ajo
 2. **Vérifiez les pages.** Touchez une image pour l’agrandir ; « Voir à taille réelle » permet de contrôler les détails. Les pages incertaines sont signalées.
 3. **Créez le PDF**, puis téléchargez-le ou partagez-le dans Fichiers.
 
-Une pause réelle de **0,5 seconde est l’objectif pris en charge avec les réglages recommandés**. L’application observe plusieurs images pendant cette pause et choisit une seule candidate. Elle ne prend pas une photo toutes les 0,5 seconde. Les doublons confirmés, y compris les retours en arrière et petites corrections de cadrage, sont écartés après vérification des détails. Les images entièrement vides et les candidates sans stabilité confirmée sont écartées.
+Une pause réelle de **0,5 seconde est l’objectif pris en charge avec les réglages recommandés**. L’application observe plusieurs images pendant cette pause et choisit une seule candidate. Elle ne prend pas une photo toutes les 0,5 seconde : un plancher de stabilité mesurée empêche les gels très courts d’être retenus. Les doublons confirmés, y compris les retours en arrière et petites corrections de cadrage, sont écartés après vérification des détails. Les images entièrement vides et les candidates sans stabilité confirmée sont écartées.
 
 ## Corriger le résultat si nécessaire
 

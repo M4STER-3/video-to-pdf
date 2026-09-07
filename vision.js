@@ -133,7 +133,10 @@ export class WindowTracker {
   close() {
     if (!this.run) return;
     const span = this.run.end - this.run.start;
-    if (span + 1e-6 >= Math.min(0.18, this.s.stable)) {
+    // A 0.5 s real pause may be observed as roughly 0.35–0.45 s at the
+    // boundaries. Keep a safety floor so tiny accidental freezes are not pages.
+    const minimum = Math.max(0.24, this.s.stable * 0.75);
+    if (span + 1e-6 >= minimum) {
       this.run.short = span + 1e-6 < this.s.stable + this.s.settle;
       this.windows.push(this.run);
     }

@@ -1,6 +1,6 @@
 const CACHE_PREFIX = `video-to-pdf:${self.registration.scope}:`;
-const CACHE = `${CACHE_PREFIX}v1`;
-const FILES = ['./', './index.html', './styles.css', './app.js', './video-analyzer.js', './pdf-generator.js', './lib/image-pdf.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = `${CACHE_PREFIX}v2`;
+const FILES = ['./', './index.html', './styles.css', './app.js', './video-analyzer.js', './vision.js', './auto-crop.js', './analysis-engine.js', './pdf-generator.js', './lib/image-pdf.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 const APP_URLS = new Set(FILES.map(path => new URL(path, self.registration.scope).href));
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll([...APP_URLS])));

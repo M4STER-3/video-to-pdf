@@ -1,42 +1,47 @@
-# Vidéo en PDF
+# Vidéo en PDF — Auto 2
 
-Une application pour transformer un enregistrement d’écran en pages PDF, sur iPad. **Aucune installation, aucune compilation, aucun terminal.**
+Transformez un enregistrement d’écran en PDF sur votre iPad. **Aucune installation, compilation, commande ou compte nécessaire. Tout est traité sur votre appareil.**
 
-## Ouvrir l’application
+## Ouvrir le site
 
-1. Dans ce dépôt GitHub, ouvrez **Settings → Pages**.
-2. Sélectionnez **Deploy from a branch → main → /(root)**, puis **Save**.
-3. Patientez jusqu’à ce que GitHub affiche le lien du site, puis ouvrez-le dans Safari : [Vidéo en PDF](https://M4STER-3.github.io/video-to-pdf/).
-4. Sur iPad : menu **Partager → Sur l’écran d’accueil → Ajouter** (le libellé peut varier selon la version).
+Dans GitHub : **Settings → Pages → Deploy from a branch → main → /(root) → Save**. Une fois la publication terminée, ouvrez [Vidéo en PDF](https://M4STER-3.github.io/video-to-pdf/) dans Safari.
+
+Pour l’ajouter à l’iPad : **Partager → Sur l’écran d’accueil → Ajouter**.
+
+**Mise à jour depuis la première version :** ouvrez le site avec Internet, puis fermez toutes ses fenêtres et l’application ajoutée à l’écran d’accueil. Rouvrez-le pour activer le nouveau cache. Sur un écran large, la marque **Auto 2** apparaît ; sur tous les écrans, l’accueil indique que le cadrage et l’analyse sont automatiques. Si l’ancienne version est encore affichée, refaites une fermeture complète après quelques secondes en ligne. Vos captures en cours ne sont pas conservées : exportez-les avant de fermer.
 
 ## Utilisation
 
-Choisissez une vidéo → déplacez les bords du recadrage → lancez l’analyse → vérifiez les pages → créez et téléchargez ou partagez le PDF.
+1. **Choisissez la vidéo.** Le recadrage et l’analyse démarrent automatiquement.
+2. **Vérifiez les pages.** Touchez une image pour l’agrandir ; « Voir à taille réelle » permet de contrôler les détails. Les pages incertaines sont signalées.
+3. **Créez le PDF**, puis téléchargez-le ou partagez-le dans Fichiers.
 
-- Marquez une pause d’environ une seconde par page dans l’enregistrement.
-- Les flèches sous les vignettes changent leur ordre au tactile. La croix supprime une page ; les cinq dernières suppressions peuvent être restaurées.
-- Le lecteur permet d’ajouter une frame précise, avec le même recadrage.
-- Les réglages avancés ajustent la détection. Un seuil de mouvement plus bas détecte davantage de petits mouvements. Un seuil doublon plus élevé retire davantage de pages ; zéro désactive cette suppression.
-- Les trois qualités PDF conservent la résolution et le ratio des captures. « Maximale » réutilise leur JPEG sans nouvelle compression ; elle ne restaure pas les détails absents de la vidéo.
+Une pause réelle de **0,5 seconde est l’objectif pris en charge avec les réglages recommandés**. L’application observe plusieurs images pendant cette pause et choisit une seule candidate. Elle ne prend pas une photo toutes les 0,5 seconde. Les doublons confirmés, y compris les retours en arrière et petites corrections de cadrage, sont écartés après vérification des détails. Les images entièrement vides et les candidates sans stabilité confirmée sont écartées.
 
-## Confidentialité et hors connexion
+## Corriger le résultat si nécessaire
 
-**La vidéo ne quitte jamais votre appareil.** Aucun compte, envoi, suivi, service distant ou bibliothèque CDN. GitHub Pages sert seulement l’application. Le petit module PDF est inclus dans `lib/image-pdf.js` sous licence MIT.
+- **Vérifier le cadrage** : ajustez les quatre bords ou recalculez le cadre. Appliquer le nouveau cadre relance l’analyse et remplace la sélection. « Revenir à la sélection » annule les changements de cadre non appliqués.
+- **Ajouter une page manuellement** : déplacez le lecteur, puis ajoutez l’image. Une capture déjà présente au même timestamp n’est pas ajoutée une seconde fois.
+- **Réorganiser** : utilisez les flèches sous les pages, compatibles tactile. La croix supprime une page ; les cinq dernières suppressions sont restaurables.
+- **Doublons écartés** : examinez leur position dans la vidéo. Une image peut être récupérée si sa page correspondante a été supprimée.
+- **Réglages avancés** : les valeurs recommandées visent les pauses de 0,5 seconde. Les augmenter peut faire manquer des pauses courtes. Un seuil doublon de zéro désactive leur suppression.
 
-Attendez la mention **Disponible hors connexion** après le premier chargement. Vous pouvez ensuite rouvrir l’application sans réseau, tant que Safari conserve son cache. Les vidéos doivent être disponibles sur l’appareil ; un fichier uniquement dans iCloud doit être téléchargé auparavant. Les pages en cours ne sont pas sauvegardées après fermeture ou rechargement : exportez votre PDF avant de quitter.
+## Qualité, confidentialité et limites
 
-## Limites à connaître
+- Les JPEG et le PDF conservent la résolution réelle de la zone recadrée. « Qualité maximale » réutilise les captures sans compression supplémentaire. Aucune option ne peut recréer du texte absent ou illisible dans la vidéo.
+- **Aucune vidéo n’est envoyée à GitHub ou ailleurs.** Aucune API distante, aucun suivi et aucun CDN. GitHub Pages sert uniquement le code. Le PDF est produit par le module local `lib/image-pdf.js` sous licence MIT.
+- Attendez **Disponible hors connexion** après le premier chargement. Le site peut ensuite se rouvrir hors ligne tant que Safari conserve son cache. Téléchargez auparavant toute vidéo stockée uniquement dans iCloud.
+- Gardez le site au premier plan. L’application tente de maintenir l’écran allumé lorsque le navigateur le permet. Une suspension de Safari peut interrompre le traitement.
+- MP4/MOV sont acceptés si le codec est décodable par Safari. Il n’y a aucune conversion vidéo. Les changements de dimensions en cours de vidéo demandent des extraits séparés.
+- Le recadrage est automatique lorsqu’il existe des limites visuelles cohérentes. En cas de doute, il conserve une zone plus large et demande une vérification plutôt que couper du texte. Une zone visible n’est pas nécessairement une page complète ; aucune partie hors écran n’est reconstruite.
+- Des menus immobiles, des changements très fins, un défilement sans véritable arrêt ou des documents sans bords distincts peuvent encore nécessiter une correction. Une ressemblance incertaine est conservée pour éviter de supprimer une vraie différence. L’absence absolue de doublons n’est donc pas garantie sur toute vidéo.
+- Limite préventive : **200 pages ou 160 Mo d’images**, suppressions restaurables comprises. Safari peut atteindre sa limite mémoire avant cela. Utilisez plusieurs extraits pour les longues vidéos. Le traitement approfondi fait plus de lectures que la première version.
+- Les captures sont temporaires : **exportez avant de fermer ou recharger**. Si le partage est indisponible, le téléchargement prend le relais.
 
-- Seuls les codecs que votre navigateur sait décoder sont acceptés ; MP4/MOV ne garantissent pas la compatibilité du codec. Aucune conversion vidéo n’est effectuée.
-- Gardez l’application au premier plan et l’écran allumé. Safari peut suspendre une analyse en arrière-plan.
-- La détection est visuelle et approximative. Défilements très lents, menus immobiles, petites animations ou pages très semblables peuvent demander une correction manuelle. Les retours à une ancienne page sont supprimés si elle est reconnue comme doublon.
-- La limite préventive est de **200 pages ou 160 Mo d’images**, suppressions restaurables comprises. Safari peut manquer de mémoire avant cette limite sur certains appareils. Exportez en plusieurs parties avec des vidéos plus courtes si nécessaire.
-- Les captures utilisent la résolution réelle du recadrage, sans agrandissement ni reconnaissance de texte. Une vidéo exceptionnellement grande peut dépasser les limites du canvas Safari.
-- Si le partage n’est pas pris en charge, utilisez le téléchargement. Selon Safari, le PDF peut s’ouvrir dans un aperçu ; utilisez alors son menu Partager pour l’enregistrer dans Fichiers.
-- Le fonctionnement sur un iPad physique doit être vérifié avec votre version de Safari et vos vidéos ; les vérifications de développement sont décrites dans `VALIDATION.md`.
+## Vérification du projet
 
-## Fichiers
+La livraison contient des tests du moteur, des caractères réellement rastérisés et des tests d’interactions avec un DOM simulé. Vous pouvez les exécuter depuis [la page de tests](./tests/index.html), sans installation. Ils ne constituent pas une validation sur iPad physique ou sur vos vidéos.
 
-`index.html` et `styles.css` : interface. `app.js` : interactions et gestion mémoire. `video-analyzer.js` : lecture, capture, stabilité et doublons. `pdf-generator.js` et `lib/image-pdf.js` : PDF local. Manifest, icônes et service worker : installation sur l’écran d’accueil et cache hors connexion.
+Voir [VALIDATION.md](./VALIDATION.md) pour les résultats et limites des essais, et [ALGORITHM.md](./ALGORITHM.md) pour le fonctionnement détaillé.
 
-Pour une mise à jour du code, augmentez la version `v1` dans `service-worker.js`. Fermez toutes les fenêtres de l’application puis rouvrez-la pour activer la nouvelle version. Aucun workflow personnalisé n’est nécessaire.
+Pour une future mise à jour, changez la version du cache dans `service-worker.js` avec les fichiers modifiés. Aucun workflow personnalisé ni build n’est nécessaire.

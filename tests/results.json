@@ -1,0 +1,156 @@
+{
+  "version": "Auto 2",
+  "date": "2026-09-07",
+  "runtime": "V8 sans Node.js ; adaptateurs vidéo/canvas et DOM simulés",
+  "engine": [
+    {
+      "name": "Proportions portrait, paysage et petites images",
+      "pass": true
+    },
+    {
+      "name": "Le score de netteté préfère les caractères nets",
+      "pass": true
+    },
+    {
+      "name": "Translation verticale estimée sur du texte",
+      "pass": true
+    },
+    {
+      "name": "Translation horizontale estimée sur du texte",
+      "pass": true
+    },
+    {
+      "name": "Pause longue : une seule fenêtre, pas une photo toutes les 0,5 s",
+      "pass": true
+    },
+    {
+      "name": "Pause de 0,5 s reconnue pour 12 décalages d’échantillonnage",
+      "pass": true
+    },
+    {
+      "name": "Scroll continu rapide : aucune fenêtre stable",
+      "pass": true
+    },
+    {
+      "name": "Scroll continu lent : aucune fenêtre stable",
+      "pass": true
+    },
+    {
+      "name": "Animation locale dans un coin : la page reste stable",
+      "pass": true
+    },
+    {
+      "name": "Un numéro modifié durablement dans un coin crée une candidate",
+      "pass": true
+    },
+    {
+      "name": "Une petite modification noyée dans les marges reste détectable",
+      "pass": true
+    },
+    {
+      "name": "Un clignotement intermittent ne multiplie pas les pages",
+      "pass": true
+    },
+    {
+      "name": "Doublon exact supprimable",
+      "pass": true
+    },
+    {
+      "name": "Une petite correction de cadrage ne crée pas une seconde photo",
+      "pass": true
+    },
+    {
+      "name": "Bruit faible de compression toléré",
+      "pass": true
+    },
+    {
+      "name": "Un petit caractère modifié doit rester une vraie page",
+      "pass": true
+    },
+    {
+      "name": "Vraies lettres anticrénelées : 17 et 18 restent deux pages",
+      "pass": true
+    },
+    {
+      "name": "Pages différentes et déduplication désactivée",
+      "pass": true
+    },
+    {
+      "name": "Calibration bornée même si toute la vidéo bouge",
+      "pass": true
+    },
+    {
+      "name": "Recadrage automatique : document clair",
+      "pass": true
+    },
+    {
+      "name": "Recadrage automatique : document sombre",
+      "pass": true
+    },
+    {
+      "name": "Un menu temporaire ne détermine pas le recadrage",
+      "pass": true
+    },
+    {
+      "name": "Sans limites fiables : conserver l’image entière",
+      "pass": true
+    },
+    {
+      "name": "Une ligne de tableau fine ne devient pas une marge",
+      "pass": true
+    },
+    {
+      "name": "Seek séquentiel, timestamp identique et libération des écouteurs",
+      "pass": true
+    },
+    {
+      "name": "Annulation avant un seek",
+      "pass": true
+    },
+    {
+      "name": "Annulation pendant un seek et nettoyage des événements",
+      "pass": true
+    },
+    {
+      "name": "Erreur de décodage : message lisible et écouteurs libérés",
+      "pass": true
+    },
+    {
+      "name": "Pipeline A → B (pause 0,5 s) → A : deux images finales",
+      "pass": true
+    },
+    {
+      "name": "Pipeline sans suppression : le retour A reste récupérable",
+      "pass": true
+    },
+    {
+      "name": "Annulation pendant la recherche des pauses",
+      "pass": true
+    },
+    {
+      "name": "Limite mémoire simulée : conserver la première page et tout libérer",
+      "pass": true
+    },
+    {
+      "name": "La meilleure candidate évite une image floue au milieu",
+      "pass": true
+    },
+    {
+      "name": "Un écran entièrement vide ne devient pas une page",
+      "pass": true
+    }
+  ],
+  "interactions": {
+    "passed": true,
+    "checks": 12
+  },
+  "comparison": {
+    "newDecision": "possible",
+    "oldRuleWouldSuppress": true,
+    "oldThreshold": 0.006,
+    "realDigitChangeMean": 0.00009197658962673611
+  },
+  "browser": "Non exécuté",
+  "realIPad": "Non exécuté",
+  "userVideo": "Aucun extrait fourni"
+}

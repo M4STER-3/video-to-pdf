@@ -1,45 +1,61 @@
-# Vérifications de livraison — 7 septembre 2026
+# Validation Auto 2 — 7 septembre 2026
 
-## Vérifications exécutées
+## Nature des vérifications
 
-| Point | Résultat et portée |
+**Les vérifications ci-dessous sont exécutées, mais aucune vidéo utilisateur ni aucun iPad physique n’a été testé.** Le moteur JavaScript a été exécuté dans V8, sans Node.js. Les fonctions de lecture vidéo et de capture ont des adaptateurs déterministes pour les tests d’intégration ; les interactions de l’application utilisent un DOM simulé. De vrais caractères rastérisés et anticrénelés sont inclus pour vérifier une modification de chiffre.
+
+Aucun navigateur n’a été piloté. Le skill `control-browser` impose un environnement Node.js pour son pilotage, ce qui est exclu par les consignes de ce projet. La page `tests/index.html` permet de réexécuter les tests depuis GitHub Pages sans installation ; elle ne transforme pas ces scénarios simulés en validation Safari réelle.
+
+## Résultats
+
+Les résultats nommés sont conservés dans `tests/results.json`. La suite du moteur couvre **34 tests**, complétés par **12 contrôles d’interactions simulées**.
+
+| Domaine | Vérification |
 | --- | --- |
-| Fichiers HTML, CSS et JavaScript | Présents ; syntaxe des cinq fichiers JavaScript analysée avec le moteur JavaScript V8, sans Node.js. |
-| Références de l’interface | Identifiants HTML uniques et références JavaScript contrôlées ; tous les identifiants utilisés existent. |
-| Chemins GitHub Pages | Références HTML, imports JavaScript, icônes et manifest vérifiés : chemins relatifs, fichiers présents. |
-| PWA | Manifest JSON valide ; `start_url`, `scope` et `id` relatifs ; PNG vérifiés à 192 × 192 et 512 × 512. |
-| Absence d’installation | Aucun package.json, gestionnaire de paquets, Node.js, build ou dépendance CDN dans le projet. |
-| Stabilité | Tests exécutés sur séquences synthétiques : longue pause → une page ; deux pauses → deux pages ; scroll rapide et scroll lent continu → aucune ; pause trop brève → aucune ; léger tremblement → une page. |
-| Doublons | Analyse exécutée avec vidéo/canvas simulés : parcours A → B → A produit deux pages ; seuil zéro produit trois pages. |
-| Extraction | Dans le test simulé, timestamps choisis au milieu des pauses et dimensions du recadrage conservées (1200 × 1800). Les pixels réels d’une vidéo n’ont pas été testés. |
-| Progression et annulation | Tests simulés : progression finale à 100 %, annulation pendant l’analyse et avant un seek, absence d’écouteurs restants après seek/annulation. |
-| PDF | Le vrai module JavaScript a généré un PDF binaire avec deux vrais JPEG. Lecture stricte réussie avec pypdf, deux pages, ratios 1:2 et 2:1 exacts, images JPEG extraites et décodées aux dimensions d’origine, table xref valide. Le Blob a été simulé par un assemblage des mêmes octets. |
+| Pause de 0,5 seconde | Détectée pour douze décalages de l’arrêt par rapport aux observations ; vérifiée aussi dans le parcours A → B → A. |
+| Longue pause | Une seule fenêtre candidate sur dix secondes, sans capture périodique. |
+| Défilement | Aucun intervalle stable retenu dans les cas testés de scroll lent continu et rapide. |
+| Déplacement | Estimation horizontale et verticale sur des motifs de texte ; petite correction reconnue comme doublon. |
+| Animation | Clignotement local ignoré ; changement local persistant reconnu. |
+| Petits détails | Un changement local, une petite différence entourée de marges et les vrais textes « Total : 17 » / « Total : 18 » ne sont pas assimilés à un doublon confirmé. |
+| Bruit et doublons | Copie exacte, bruit faible de compression, retour à une ancienne page et désactivation de la déduplication. |
+| Recadrage | Documents clairs et sombres, menu temporaire, absence de bords fiables, ligne fine de tableau. Les bords attendus restent à l’intérieur du cadre conservé. |
+| Qualité | Les caractères nets obtiennent un meilleur score que leur version floutée ; une candidate floue au milieu d’une pause n’est pas choisie dans le scénario testé. |
+| Images sans contenu | Un écran entièrement vide n’est pas extrait comme page. |
+| Robustesse | Calibration bornée, seeks séquentiels, même timestamp, annulation avant et pendant un seek, erreur de décodage, annulation de l’analyse, limite mémoire simulée. |
+| Libération | Nettoyage des écouteurs et des quatre samplers, y compris après erreur d’extraction. |
+| Progression | Pourcentage non décroissant dans l’analyse et arrivée à 100 % après succès. |
+| Interactions | Import suivi automatiquement du cadrage et de l’analyse ; ordre tactile ; suppression/restauration ; aperçu original et validation ; correction de cadre annulée ; refus des réglages invalides ; verrou contre deux traitements simultanés ; révocation des URL d’aperçu. |
 
-## Revue du code effectuée
+## Comparaison avec la logique initiale
 
-- Import : filtrage des fichiers, métadonnées, délai maximal, message de codec incompatible, révocation des URL vidéo et annulation de l’ouverture.
-- Lecture : seeks attendus et séquentiels, événements `seeked`/`loadeddata`, contrôle `readyState`, erreurs et délais maximaux. Aucun recours obligatoire à `requestVideoFrameCallback`, qui peut ne pas être déclenché sur une vidéo en pause.
-- Recadrage : quatre bords avec Pointer Events et capture du pointeur, réglage au clavier, conversion vers `videoWidth`/`videoHeight`, même zone pour toutes les captures.
-- Analyse : comparaison 64 × 64 en niveaux de gris, différence moyenne absolue, ancrage pour éviter le scroll lent, délai après mouvement, milieu des pauses, seuil distinct pour doublons.
-- Mémoire : JPEG et petites miniatures ; pas de collection de frames brutes ; canvas libérés ; URL révoquées ; plafond de pages et de taille ; cinq suppressions restaurables maximum.
-- Interface : verrouillage pendant les opérations, annulation, ajout manuel, suppression/restauration, boutons tactiles de réordonnancement, invalidation du PDF si les pages changent, messages lisibles.
-- Export : date locale dans le nom, taille du PDF, téléchargement Blob, `navigator.share` avec `navigator.canShare` et téléchargement de secours.
-- Hors connexion : cache des seuls fichiers applicatifs, URLs construites avec le scope, nettoyage limité aux caches de cette application, activation des mises à jour après fermeture des anciennes sessions.
-- Confidentialité : aucun envoi de vidéo, aucun appel distant de traitement, aucun suivi, aucune clé ou secret.
-- Accessibilité : labels, boutons sémantiques, focus visible, annonce de progression, mode clair/sombre et règles pour petits écrans.
+L’ancien réglage demandait 0,5 s de stabilité **plus** 0,25 s de marge : une vraie pause de 0,5 s ne pouvait pas satisfaire cette condition. Auto 2 tient compte de l’écart entre la pause réelle et les observations, puis confirme ses candidates.
 
-## Vérifications restant à faire sur appareil réel
+Sur la paire de pages contenant les vrais chiffres 17 et 18, la différence moyenne globale est d’environ **0,000092**, bien inférieure à l’ancien seuil doublon de 0,006. Cela illustre pourquoi une moyenne seule peut supprimer une vraie différence. La vérification locale d’Auto 2 conserve cette paire, signalée comme ressemblante. Il s’agit d’un cas de test, pas d’une mesure de précision sur les vidéos de l’utilisateur.
 
-**Aucun navigateur ni iPad physique n’a été utilisé pour valider cette livraison.** L’environnement ne proposait pas de prévisualisation compatible avec ce projet statique sans installation. Les contrôles ci-dessus ne remplacent pas des essais réels du décodage et de l’interface.
+## Vérifications statiques
 
-Après activation de GitHub Pages, vérifier dans Safari sur l’iPad cible :
+- Syntaxe de tous les scripts analysée ; imports et fichiers correspondants vérifiés.
+- Identifiants HTML uniques et références de `app.js` contrôlées.
+- Valeurs recommandées cohérentes entre l’interface et le moteur.
+- Manifest valide ; icônes PNG 192 × 192 et 512 × 512 vérifiées.
+- Tous les modules utilisés par l’application inclus dans le cache `v2`.
+- Chemins relatifs et résolution sous un sous-dossier GitHub Pages contrôlés.
+- Aucun package.json, installation, build, Node.js ou dépendance CDN nécessaire.
+- Aucun envoi de vidéo ou service distant de traitement dans le code.
+- Revue des URL Blob, encodages séquentiels, verrouillage des contrôles, annulation, recadrage constant et limites mémoire.
 
-1. Importer un MP4/MOV depuis Fichiers puis Photos ; vérifier lecture, métadonnées et orientation.
-2. Déplacer les quatre bords, avancer de 0,1 s et capturer une page ; vérifier visuellement la netteté et les limites du recadrage.
-3. Analyser une vidéo avec pauses, scroll et retour en arrière ; comparer la sélection attendue, puis annuler une seconde analyse après réimport.
-4. Supprimer, restaurer, déplacer et ajouter des pages ; générer les trois qualités PDF et vérifier l’ordre dans le fichier.
-5. Télécharger puis partager le PDF dans Fichiers ; vérifier le comportement de secours si le partage est indisponible.
-6. Ajouter à l’écran d’accueil ; attendre « Disponible hors connexion », fermer, activer le mode avion et rouvrir l’application.
-7. Essayer un enregistrement représentatif de la durée et de la résolution habituelles, ainsi qu’un écran étroit et du texte agrandi.
+Le module PDF binaire n’a pas changé : lors de la première livraison, son fichier réel de test a été lu strictement avec pypdf, avec deux JPEG décodables, ratios portrait/paysage préservés et table xref valide. Ses imports vers les modules modifiés ont été vérifiés pour Auto 2.
 
-Les limites connues et conseils mémoire figurent dans le README. La détection visuelle reste approximative : la vérification manuelle des pages est nécessaire.
+## Essais réels toujours nécessaires
+
+Sur l’iPad et avec des enregistrements représentatifs, vérifier :
+
+1. Import depuis Fichiers et Photos, codecs MP4/MOV, orientation et durée.
+2. Arrêts de 0,5 s, menus, zooms, corrections de scroll, pages très semblables et retours en arrière.
+3. Correspondance visuelle entre le recadrage proposé, les pages originales et les JPEG exportés.
+4. Netteté des caractères, nombre de pages attendu, éventuels doublons restants et faux rejets.
+5. Durée de traitement et mémoire sur un enregistrement long à haute résolution.
+6. Partage/téléchargement du PDF, arrêt de l’analyse, fermeture de Safari, installation sur l’écran d’accueil et réouverture hors connexion.
+
+Aucun taux de réussite universel n’est revendiqué. Le moteur ne comprend pas sémantiquement ce qu’est une page et ne peut pas reconstituer les parties hors écran. Les cas incertains sont conservés ou signalés pour vérification.

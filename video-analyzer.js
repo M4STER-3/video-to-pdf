@@ -1,4 +1,5 @@
-export const RECOMMENDED = Object.freeze({ fps: 4, stable: 0.5, motion: 0.012, duplicate: 0.006, settle: 0.25, jpeg: 0.94 });
+import { describe, dimensions } from './vision.js';
+export const RECOMMENDED = Object.freeze({ fps: 8, stable: 0.3, motion: 0.012, duplicate: 0.006, settle: 0.06, jpeg: 0.96 });
 export function checkAbort(signal) { if (signal?.aborted) throw new DOMException('Analyse annulée', 'AbortError'); }
 
 // All callers await this function. No concurrent seeks are permitted by the UI.
@@ -22,29 +23,6 @@ export async function seekVideoTo(video, time, signal) {
   checkAbort(signal);
 }
 
-export function calculateFrameDifference(a, b) {
-  if (!a || !b || a.length !== b.length || !a.length) return 1;
-  let sum = 0; for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
-  return sum / (a.length * 255);
-}
-
-export class StabilityDetector {
-  constructor(settings) { this.s = settings; this.previous = null; this.anchor = null; this.start = 0; this.end = 0; }
-  finish() {
-    if (!this.anchor || this.end - this.start + 1e-6 < this.s.stable + this.s.settle) return null;
-    return { time: (this.start + this.s.settle + this.end) / 2 };
-  }
-  push(frame, time) {
-    let candidate = null;
-    // The anchored comparison catches cumulative slow scrolling that adjacent
-    // frame comparisons alone would incorrectly classify as a stable page.
-    if (!this.anchor || calculateFrameDifference(frame, this.previous) > this.s.motion || calculateFrameDifference(frame, this.anchor) > this.s.motion * 1.5) {
-      candidate = this.finish(); this.start = time; this.anchor = frame;
-    }
-    this.end = time; this.previous = frame; return candidate;
-  }
-}
-
 export function canvasBlob(canvas, quality) {
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Mémoire insuffisante pour cette image. Fermez les autres applications ou utilisez une vidéo moins grande.')), 'image/jpeg', quality));
 }
@@ -53,7 +31,7 @@ export async function captureFrame(video, crop, quality) {
   const canvas = document.createElement('canvas');
   canvas.width = crop.w; canvas.height = crop.h;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Mémoire insuffisante pour capturer la page.');
+  if (!context) { canvas.width = canvas.height = 1; throw new Error('Mémoire insuffisante pour capturer la page.'); }
   try {
     context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
@@ -70,38 +48,22 @@ export async function captureFrame(video, crop, quality) {
   } finally { canvas.width = canvas.height = 1; }
 }
 
-export async function analyzeVideo(video, crop, settings, signal, onProgress, onPage) {
-  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 64;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) throw new Error('L’analyse ne peut pas démarrer : mémoire insuffisante.');
-  const detector = new StabilityDetector(settings), fingerprints = [];
-  const duration = video.duration, total = Math.ceil(duration * settings.fps);
-  let accepted = 0;
-  function sample() {
-    ctx.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, 64, 64);
-    const pixels = ctx.getImageData(0, 0, 64, 64).data, gray = new Uint8Array(4096);
-    for (let i = 0; i < gray.length; i++) gray[i] = Math.round(pixels[i * 4] * 0.299 + pixels[i * 4 + 1] * 0.587 + pixels[i * 4 + 2] * 0.114);
-    return gray;
-  }
-  async function retain(candidate) {
-    if (!candidate) return;
-    await seekVideoTo(video, candidate.time, signal);
-    const fingerprint = sample();
-    if (settings.duplicate > 0 && fingerprints.some(f => calculateFrameDifference(f, fingerprint) < settings.duplicate)) return;
-    checkAbort(signal);
-    const page = await captureFrame(video, crop, settings.jpeg); checkAbort(signal);
-    await onPage(page); fingerprints.push(fingerprint); accepted++;
-  }
-  try {
-    for (let i = 0; i <= total; i++) {
-      checkAbort(signal); const time = Math.min(i / settings.fps, Math.max(0, duration - 0.001));
-      await seekVideoTo(video, time, signal);
-      const candidate = detector.push(sample(), time);
-      await retain(candidate);
-      onProgress(Math.min(99, Math.floor(i / Math.max(1, total) * 100)), accepted);
-      // Allow paint, taps and the cancel button even on very fast decoders.
-      if (i % 4 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-    }
-    await retain(detector.finish()); onProgress(100, accepted);
-  } finally { canvas.width = canvas.height = 1; }
+export function createSampler(crop, longest = 192) {
+  const canvas = document.createElement('canvas'), size = dimensions(crop.w, crop.h, longest);
+  canvas.width = size.width; canvas.height = size.height;
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) { canvas.width = canvas.height = 1; throw new Error('Mémoire insuffisante pour analyser la vidéo.'); }
+  let sourceWidth = null, sourceHeight = null;
+  return {
+    read(video) {
+      if ((sourceWidth !== null && (sourceWidth !== video.videoWidth || sourceHeight !== video.videoHeight)) || crop.x + crop.w > video.videoWidth || crop.y + crop.h > video.videoHeight) throw new Error('Les dimensions de la vidéo changent pendant la lecture. Utilisez un extrait avec une orientation constante pour conserver un cadrage correct.');
+      sourceWidth = video.videoWidth; sourceHeight = video.videoHeight;
+      context.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const gray = new Uint8Array(canvas.width * canvas.height);
+      for (let i = 0; i < gray.length; i++) gray[i] = Math.round(pixels[i * 4] * 0.299 + pixels[i * 4 + 1] * 0.587 + pixels[i * 4 + 2] * 0.114);
+      return describe(gray, canvas.width, canvas.height);
+    },
+    dispose() { canvas.width = canvas.height = 1; }
+  };
 }

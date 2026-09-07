@@ -65,8 +65,50 @@ export function inferCrop(frames, originalWidth, originalHeight) {
   if (outsideMoves('x', left, 'start') || outsideMoves('x', right, 'end')) left = right = null;
   if (outsideMoves('y', top, 'start')) top = null;
   if (outsideMoves('y', bottom, 'end')) bottom = null;
-  const found = [left, right, top, bottom].filter(Boolean).length;
-  if (!found) return { crop: full, confidence: 'low', reason: 'Bords incertains : l’image entière est conservée pour éviter de couper du contenu.' };
+  let found = [left, right, top, bottom].filter(Boolean).length;
+  if (!found && frames.length >= 5) {
+    // Some tablets render a soft shadow beside the document. The strict
+    // multi-gap test above intentionally rejects that shadow; recover only
+    // when a broad, persistent luminance step confirms all four sides.
+    const median = (axis, from, to) => {
+      const length = axis === 'x' ? w : h, profiles = [];
+      for (const frame of frames) {
+        const values = [];
+        for (let p = 0; p < length; p++) {
+          let sum = 0, n = 0;
+          for (let q = from; q < to; q += 2) {
+            sum += axis === 'x' ? frame.gray[q * w + p] : frame.gray[p * w + q]; n++;
+          }
+          values.push(sum / Math.max(1, n));
+        }
+        profiles.push(values);
+      }
+      return Array.from({ length }, (_, p) => quantile(profiles.map(profile => profile[p]), 0.5));
+    };
+    const edgeFromProfile = (axis, side, from, to, minimumContrast = 18) => {
+      const length = axis === 'x' ? w : h, profile = median(axis, from, to), start = side === 'start' ? 8 : Math.floor(length * 0.62), end = side === 'start' ? Math.floor(length * 0.38) : length - 8;
+      let best = null;
+      for (let p = start; p < end; p++) {
+        const before = profile.slice(Math.max(0, p - 4), p), after = profile.slice(p, Math.min(length, p + 4));
+        const a = before.reduce((sum, value) => sum + value, 0) / Math.max(1, before.length), b = after.reduce((sum, value) => sum + value, 0) / Math.max(1, after.length), contrast = Math.abs(a - b);
+        if (!best || contrast > best.contrast) best = { p, contrast };
+      }
+      return best && best.contrast >= minimumContrast ? best : null;
+    };
+    const robustLeft = edgeFromProfile('x', 'start', Math.floor(h * 0.16), Math.ceil(h * 0.84));
+    const robustRight = edgeFromProfile('x', 'end', Math.floor(h * 0.16), Math.ceil(h * 0.84));
+    const robustTop = edgeFromProfile('y', 'start', robustLeft?.p ?? Math.floor(w * 0.08), robustRight?.p ?? Math.ceil(w * 0.92));
+    if (robustLeft && robustRight) {
+      left = { p: robustLeft.p, score: robustLeft.contrast / 255, support: 1 };
+      right = { p: robustRight.p, score: robustRight.contrast / 255, support: 1 };
+      if (robustTop) top = { p: robustTop.p, score: robustTop.contrast / 255, support: 1 };
+      // Bottom chrome often contains a home indicator with a stronger edge
+      // than the actual page. Keep that side uncropped unless the strict
+      // detector already proved it safe.
+      found = [left, right, top, bottom].filter(Boolean).length;
+    }
+  }
+  if (!found && !(left && right && top && bottom)) return { crop: full, confidence: 'low', reason: 'Bords incertains : l’image entière est conservée pour éviter de couper du contenu.' };
   // Keep a safety margin inside the excluded UI, outside the document boundary.
   const x = left ? Math.max(0, left.p - 3) : 0, y = top ? Math.max(0, top.p - 3) : 0;
   const endX = right ? Math.min(w, right.p + 3) : w, endY = bottom ? Math.min(h, bottom.p + 3) : h;

@@ -2,7 +2,7 @@
 
 ## Nature des vérifications
 
-**Les vérifications ci-dessous sont exécutées, mais aucune vidéo utilisateur ni aucun iPad physique n’a été testé.** Le moteur JavaScript a été exécuté dans V8, sans Node.js. Les fonctions de lecture vidéo et de capture ont des adaptateurs déterministes pour les tests d’intégration ; les interactions de l’application utilisent un DOM simulé. De vrais caractères rastérisés et anticrénelés sont inclus pour vérifier une modification de chiffre.
+**Les vérifications ci-dessous sont exécutées ; l’iPad physique n’a pas été testé.** Le moteur JavaScript a été exécuté dans V8, sans Node.js. Les fonctions de lecture vidéo et de capture ont des adaptateurs déterministes pour les tests d’intégration ; les interactions de l’application utilisent un DOM simulé. De vrais caractères rastérisés et anticrénelés sont inclus pour vérifier une modification de chiffre. La vidéo utilisateur `Unknown.mp4` a aussi été inspectée image par image (voir plus bas).
 
 Aucun navigateur n’a été piloté. Le skill `control-browser` impose un environnement Node.js pour son pilotage, ce qui est exclu par les consignes de ce projet. La page `tests/index.html` permet de réexécuter les tests depuis GitHub Pages sans installation ; elle ne transforme pas ces scénarios simulés en validation Safari réelle.
 
@@ -26,6 +26,10 @@ Les résultats nommés sont conservés dans `tests/results.json`. La suite du mo
 | Libération | Nettoyage des écouteurs et des quatre samplers, y compris après erreur d’extraction. |
 | Progression | Pourcentage non décroissant dans l’analyse et arrivée à 100 % après succès. |
 | Interactions | Import suivi automatiquement du cadrage et de l’analyse ; ordre tactile ; suppression/restauration ; aperçu original et validation ; correction de cadre annulée ; refus des réglages invalides ; verrou contre deux traitements simultanés ; révocation des URL d’aperçu. |
+
+## Essai sur `Unknown.mp4`
+
+L’extrait fourni (9,3 s, 960 × 720, 30 i/s) contient six pages uniques. L’inspection multi-images retrouve les états A → B → C → A → D → E → F → F avec overlay ; le retour à A et la variante finale de F sont donc des doublons attendus, pas des pages supplémentaires. Le recadrage renforcé retrouve une zone documentaire d’environ **x=240, y=60, 486 × 660 px** (confiance moyenne, bord inférieur conservé par précaution). Le résultat attendu après déduplication est **6 pages**.
 
 ## Comparaison avec la logique initiale
 

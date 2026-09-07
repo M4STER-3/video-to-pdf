@@ -80,12 +80,12 @@ export function motionMetrics(a, b, threshold = 0.012) {
       if (x > 0 && x < 5 && y > 0 && y < 5) { centerTiles++; outerOnly = false; }
     }
   }
-  const localAnimation = outerOnly && changedTiles <= 2 && changed / a.gray.length < 0.035;
+  const localAnimation = outerOnly && changedTiles > 0 && changedTiles <= 2 && changed / a.gray.length < 0.035;
   const translation = absolute / (a.gray.length * 255) > 0.0015 ? estimateTranslation(a, b) : { dx: 0, dy: 0, gain: 0, residual: 0 };
   const shifted = translation.gain > 0.24 && (translation.dx !== 0 || translation.dy !== 0) && translation.residual < 0.1;
-  const smallEdit = maxDetail >= 2 && changed / a.gray.length < 0.015;
+  const smallEdit = maxDetail >= 2 && changed / a.gray.length < 0.015 && maxDetail >= changed * 0.18;
   return { mean: absolute / (a.gray.length * 255), robust: quantile(tileScores, 0.7), changedTiles, centerTiles, active, localAnimation, shifted, translation, smallEdit,
-    changed: !localAnimation && (smallEdit || centerTiles > 0 || changedTiles >= Math.max(3, Math.ceil(active * 0.3))) };
+    changed: !localAnimation && (smallEdit || centerTiles >= Math.max(2, Math.ceil(active * 0.25)) || changedTiles >= Math.max(3, Math.ceil(active * 0.4))) };
 }
 
 // Strict duplicate verification at up to 1280 px. Mean difference alone is
@@ -107,9 +107,36 @@ export function verifyDuplicate(a, b, sensitivity = 0.006) {
     }
     const mean = sum / Math.max(1, count) / 255, edge = edgeSum / Math.max(1, count) / 255;
     const exact = mean < 0.006 * factor && edge < 0.007 * factor && changed <= Math.max(2, count * 0.000025 * factor) && maxCell <= 2 * factor && borderChange <= 2;
-    return { kind: exact ? 'duplicate' : mean < 0.038 * factor && edge < 0.045 * factor ? 'possible' : 'different', mean, changed, maxCell, dx, dy };
+    return { kind: exact ? 'duplicate' : mean < 0.038 * factor && edge < 0.045 * factor ? 'possible' : 'different', mean, edge, changed, maxCell, dx, dy };
   }
   const direct = compare(); if (direct.kind === 'duplicate') return direct;
+  // Codec noise and a viewer's delayed text rendering are spread across the
+  // sheet. A real localized edit must remain reviewable, even with tiny mean.
+  if (direct.mean < 0.036 * factor && signatureDistance(a.signature, b.signature) < 0.006 * factor && direct.changed > direct.maxCell * 12) {
+    let total = 0, count = 0, changed = 0, maximum = 0;
+    const cells = new Uint16Array(Math.ceil(w / 16) * Math.ceil(h / 16));
+    for (let y = 3; y < h - 3; y++) for (let x = 3; x < w - 3; x++) {
+      let delta = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const i = (y + dy) * w + x + dx; delta += a.gray[i] - b.gray[i];
+      }
+      const difference = Math.abs(delta) / 25;
+      total += difference; count++;
+      if (difference > 12 * factor) { changed++; const cell = Math.floor(y / 16) * Math.ceil(w / 16) + Math.floor(x / 16); maximum = Math.max(maximum, ++cells[cell]); }
+    }
+    if (total / Math.max(1, count) / 255 < 0.014 * factor && maximum < 90 * factor && (changed === 0 || changed > maximum * 12)) return { ...direct, kind: 'duplicate', reason: 'Même contenu, variations de compression ou de rendu' };
+  }
+  // A system panel can uniformly dim a previously captured sheet. Confirm the
+  // content at full detail after fitting the illumination, before rejecting it.
+  const appearance = appearanceDistance(a.signature, b.signature);
+  if (appearance.gain > 0.3 && appearance.gain < 0.8 && appearance.distance < 0.018) {
+    let residual = 0, bad = 0;
+    for (let i = 0; i < a.gray.length; i++) {
+      const d = Math.abs(a.gray[i] - (b.gray[i] - appearance.offset * 255) / appearance.gain);
+      residual += d; if (d > 40) bad++;
+    }
+    if (residual / a.gray.length / 255 < 0.018 && bad / a.gray.length < 0.04) return { ...direct, kind: 'obscured', reason: 'Même feuille assombrie par une interface temporaire' };
+  }
   // Tiny framing corrections are duplicates only if alignment explains the
   // differences AND no new detail appears in the interior or entering border.
   const range = Math.min(4, Math.max(1, Math.round(Math.min(w, h) * 0.006)));
@@ -121,11 +148,26 @@ export function verifyDuplicate(a, b, sensitivity = 0.006) {
   return direct;
 }
 
+// Fit b = gain * a + offset on luminance tiles. Edge agreement provides an
+// independent check; similar overall brightness alone cannot match pages.
+export function appearanceDistance(a, b) {
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  const n = a.length / 2;
+  for (let i = 0; i < a.length; i += 2) { sx += a[i]; sy += b[i]; sxx += a[i] * a[i]; sxy += a[i] * b[i]; }
+  const variance = sxx - sx * sx / n;
+  if (variance < 0.0001) return { distance: 1, gain: 1, offset: 0 };
+  const gain = (sxy - sx * sy / n) / variance, offset = (sy - gain * sx) / n;
+  if (gain <= 0) return { distance: 1, gain, offset };
+  let sum = 0;
+  for (let i = 0; i < a.length; i += 2) sum += Math.abs(a[i] - (b[i] - offset) / gain) + Math.abs(a[i + 1] - b[i + 1] / gain);
+  return { distance: sum / a.length, gain, offset };
+}
+
 export function adaptiveThreshold(metrics, base = 0.012) {
   const floor = quantile(metrics.filter(x => Number.isFinite(x)), 0.15);
   // Bounded: a video with only motion must never teach the detector that scroll
   // is noise. The user setting scales a conservative automatically found floor.
-  return clamp(Math.max(0.004, floor * 2.5 + 0.002), 0.004, 0.014) * clamp(base / 0.012, 0.2, 5);
+  return clamp(Math.max(0.014, floor * 2.5 + 0.002), 0.014, 0.022) * clamp(base / 0.012, 0.2, 5);
 }
 
 export class WindowTracker {

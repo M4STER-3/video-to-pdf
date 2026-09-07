@@ -1,4 +1,4 @@
-# Vidéo en PDF — Auto 2
+# Vidéo en PDF — Auto 3
 
 Transformez un enregistrement d’écran en PDF sur votre iPad. **Aucune installation, compilation, commande ou compte nécessaire. Tout est traité sur votre appareil.**
 
@@ -8,7 +8,7 @@ Dans GitHub : **Settings → Pages → Deploy from a branch → main → /(root)
 
 Pour l’ajouter à l’iPad : **Partager → Sur l’écran d’accueil → Ajouter**.
 
-**Mise à jour depuis la première version :** ouvrez le site avec Internet, puis fermez toutes ses fenêtres et l’application ajoutée à l’écran d’accueil. Rouvrez-le pour activer le nouveau cache. Sur un écran large, la marque **Auto 2** apparaît ; sur tous les écrans, l’accueil indique que le cadrage et l’analyse sont automatiques. Si l’ancienne version est encore affichée, refaites une fermeture complète après quelques secondes en ligne. Vos captures en cours ne sont pas conservées : exportez-les avant de fermer.
+**Mise à jour vers Auto 3 :** ouvrez le site avec Internet, puis fermez toutes ses fenêtres et l’application ajoutée à l’écran d’accueil. Rouvrez-le pour activer le nouveau cache. Sur un écran large, la marque **Auto 3** apparaît ; sur tous les écrans, l’accueil indique que le cadrage et l’analyse sont automatiques. Si l’ancienne version est encore affichée, refaites une fermeture complète après quelques secondes en ligne. Vos captures en cours ne sont pas conservées : exportez-les avant de fermer.
 
 ## Utilisation
 
@@ -17,6 +17,8 @@ Pour l’ajouter à l’iPad : **Partager → Sur l’écran d’accueil → Ajo
 3. **Créez le PDF**, puis téléchargez-le ou partagez-le dans Fichiers.
 
 Une pause réelle de **0,5 seconde est l’objectif pris en charge avec les réglages recommandés**. L’application observe plusieurs images pendant cette pause et choisit une seule candidate. Elle ne prend pas une photo toutes les 0,5 seconde : un plancher de stabilité mesurée empêche les gels très courts d’être retenus. Les doublons confirmés, y compris les retours en arrière et petites corrections de cadrage, sont écartés après vérification des détails. Les images entièrement vides et les candidates sans stabilité confirmée sont écartées.
+
+Le cadre suit les **quatre limites de la feuille**, avec ses proportions réelles en portrait ou paysage. Les marges blanches qui appartiennent au document sont conservées ; les barres et marges du lecteur restent à l’extérieur. Un petit compteur gris en pied de page est nettoyé uniquement si sa forme et son fond blanc sont confirmés. Le PDF ne force pas un ratio A4 sur un document d’un autre format.
 
 ## Corriger le résultat si nécessaire
 
@@ -40,7 +42,7 @@ Une pause réelle de **0,5 seconde est l’objectif pris en charge avec les rég
 
 ## Vérification du projet
 
-La livraison contient des tests du moteur, des caractères réellement rastérisés et des tests d’interactions avec un DOM simulé. Vous pouvez les exécuter depuis [la page de tests](./tests/index.html), sans installation. Ils ne constituent pas une validation sur iPad physique ou sur vos vidéos.
+La livraison contient des tests du moteur, des caractères réellement rastérisés et des tests d’interactions avec un DOM simulé. Vous pouvez les exécuter depuis [la page de tests](./tests/index.html), sans installation. Le moteur a aussi été exécuté sur les images décodées de `Unknown.mp4` : 6 pages uniques, avec recadrage complet de la feuille. Le décodage et les interactions Safari sur iPad physique restent à confirmer.
 
 Voir [VALIDATION.md](./VALIDATION.md) pour les résultats et limites des essais, et [ALGORITHM.md](./ALGORITHM.md) pour le fonctionnement détaillé.
 

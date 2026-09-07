@@ -35,6 +35,13 @@ export async function captureFrame(video, crop, quality) {
   try {
     context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(video, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+    context.fillStyle = '#fff';
+    for (const mask of crop.masks || []) {
+      // Recheck each exported frame: never erase a footer that now contains
+      // actual document content instead of the detected viewer badge.
+      const pixels = context.getImageData(mask.x, mask.y, mask.w, mask.h);
+      if (isViewerBadge(pixels.data, mask.w, mask.h)) context.fillRect(mask.x, mask.y, mask.w, mask.h);
+    }
     const blob = await canvasBlob(canvas, quality);
     const thumb = document.createElement('canvas');
     thumb.width = Math.max(1, Math.round(220 * crop.w / Math.max(crop.w, crop.h)));
@@ -66,4 +73,18 @@ export function createSampler(crop, longest = 192) {
     },
     dispose() { canvas.width = canvas.height = 1; }
   };
+}
+
+export function isViewerBadge(rgba, w, h) {
+  let ring = 0, white = 0, inner = 0, grey = 0;
+  const mx = Math.max(2, Math.round(w * 0.17)), my = Math.max(1, Math.round(h * 0.14));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, value = rgba[i] * 0.299 + rgba[i + 1] * 0.587 + rgba[i + 2] * 0.114;
+    if (x === 0 || y === 0 || x === w - 1 || y === h - 1) { ring++; if (value >= 245) white++; }
+    if (x >= mx && x < w - mx && y >= my && y < h - my) {
+      inner++;
+      if (value >= 175 && value <= 245 && Math.max(rgba[i], rgba[i + 1], rgba[i + 2]) - Math.min(rgba[i], rgba[i + 1], rgba[i + 2]) < 12) grey++;
+    }
+  }
+  return white / Math.max(1, ring) >= 0.85 && grey / Math.max(1, inner) >= 0.6;
 }

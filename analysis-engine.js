@@ -1,4 +1,4 @@
-import { WindowTracker, motionMetrics, adaptiveThreshold, signatureDistance, verifyDuplicate, clamp } from './vision.js';
+import { WindowTracker, motionMetrics, adaptiveThreshold, signatureDistance, verifyDuplicate, appearanceDistance, clamp } from './vision.js';
 import { seekVideoTo, createSampler, captureFrame, checkAbort } from './video-analyzer.js';
 
 const yieldUI = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -98,19 +98,33 @@ export async function analyzeVideo(video, crop, settings, signal, onProgress, on
       checkAbort(signal);
       const candidate = await refineWindow(video, medium, windows[i], settings, threshold, signal);
       if (!candidate) { report.rejected++; progress(60 + (i + 1) / windows.length * 39, 'Vérification des images', `${report.rejected} images vides ou instables écartées`); await yieldUI(); continue; }
-      let duplicate = null, possible = null;
-      const nearest = settings.duplicate > 0 ? index.map(entry => ({ entry, distance: signatureDistance(entry.signature, candidate.signature) })).filter(x => x.distance < 0.075).sort((a, b) => a.distance - b.distance).slice(0, 5) : [];
+      let duplicate = null, duplicateKind = null, possible = null;
+      const nearest = settings.duplicate > 0 ? index.map(entry => ({ entry, distance: Math.min(signatureDistance(entry.signature, candidate.signature), appearanceDistance(entry.signature, candidate.signature).distance) })).filter(x => x.distance < 0.075).sort((a, b) => a.distance - b.distance).slice(0, 5) : [];
       if (nearest.length) {
         await seekVideoTo(video, candidate.time, signal); const current = detail.read(video);
         for (const { entry } of nearest) {
-          await seekVideoTo(video, entry.time, signal); const comparison = verifyDuplicate(current, detail.read(video), settings.duplicate);
-          if (comparison.kind === 'duplicate') { duplicate = entry; break; }
+          await seekVideoTo(video, entry.time, signal); const comparison = verifyDuplicate(detail.read(video), current, settings.duplicate);
+          if ((comparison.kind === 'duplicate' || comparison.kind === 'obscured')) { duplicate = entry; duplicateKind = comparison.kind; break; }
           if (comparison.kind === 'possible') possible = entry;
           await yieldUI(); checkAbort(signal);
         }
       }
+      if (options.cropConfidence === 'high') candidate.reasons = candidate.reasons.filter(reason => reason !== 'Contenu proche du bord');
       if (duplicate) {
-        const item = { time: candidate.time, matchedTime: duplicate.time, matchedId: duplicate.id, reason: 'Contenu déjà retenu' };
+        const previousTime = duplicate.time;
+        // Keep the original order, replacing only the pixels when a later
+        // rendering of the same sheet is demonstrably sharper.
+        if (duplicateKind === 'duplicate' && options.onReplace && candidate.sharpness > duplicate.sharpness * 1.03) {
+          await seekVideoTo(video, candidate.time, signal);
+          const replacement = await capture(video, crop, settings.jpeg); checkAbort(signal);
+          replacement.id = duplicate.id; replacement.reasons = candidate.reasons; replacement.reviewed = !candidate.reasons.length;
+          replacement.interval = { start: candidate.start, end: candidate.end };
+          if (await options.onReplace(duplicate.id, replacement) !== false) {
+            duplicate.time = candidate.time; duplicate.signature = candidate.signature; duplicate.sharpness = candidate.sharpness;
+            for (const item of report.duplicates) if (item.matchedId === duplicate.id) item.matchedTime = duplicate.time;
+          }
+        }
+        const item = { time: duplicate.time === candidate.time ? previousTime : candidate.time, matchedTime: duplicate.time, matchedId: duplicate.id, reason: duplicateKind === 'obscured' ? 'Même feuille masquée par une interface temporaire' : 'Contenu déjà retenu' };
         report.duplicates.push(item); options.onDuplicate?.(item);
       } else {
         if (possible) candidate.reasons.push('Page ressemblante : détails conservés');
@@ -123,7 +137,7 @@ export async function analyzeVideo(video, crop, settings, signal, onProgress, on
         page.id = `auto-${i}-${candidate.time.toFixed(4)}`; page.reasons = candidate.reasons; page.reviewed = !page.reasons.length;
         page.interval = { start: candidate.start, end: candidate.end };
         await onPage(page);
-        index.push({ time: candidate.time, signature: candidate.signature, id: page.id });
+        index.push({ time: candidate.time, signature: candidate.signature, sharpness: candidate.sharpness, id: page.id });
         report.pages++; if (candidate.reasons.length) report.reviews++;
       }
       progress(60 + (i + 1) / Math.max(1, windows.length) * 39, 'Vérification et extraction', `${report.duplicates.length} doublons écartés`);

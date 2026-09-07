@@ -77,6 +77,16 @@ function acceptPage(page) {
   page.url = URL.createObjectURL(page.thumbnail); pages.push(page); invalidatePDF();
   if (!$('work-cover').hidden) { $('work-image').src = page.url; $('work-image').hidden = false; $('work-caption').textContent = `Dernière page retenue · ${pages.length}`; }
 }
+function replacePage(id, page) {
+  const index = pages.findIndex(p => p.id === id);
+  if (index < 0) throw new Error('La page à améliorer est introuvable.');
+  const old = pages[index];
+  if (totalBytes() - old.blob.size - old.thumbnail.size + page.blob.size + page.thumbnail.size > MAX_BYTES) return false;
+  page.url = URL.createObjectURL(page.thumbnail);
+  pages[index] = page; releasePage(old); invalidatePDF();
+  if (!$('work-cover').hidden) { $('work-image').src = page.url; $('work-image').hidden = false; }
+  return true;
+}
 function renderPages() {
   const grid = $('pages-grid'); grid.replaceChildren();
   pages.forEach((page, index) => {
@@ -206,7 +216,7 @@ function drawCrop() {
   $('crop-size').textContent = `${crop.w} × ${crop.h} pixels conservés`;
   $('manual-crop').textContent = `Recadrage appliqué : ${crop.w} × ${crop.h} pixels.`;
 }
-function markManualCrop() { cropInfo = { confidence: 'manual', reason: 'Recadrage choisi manuellement.' }; $('crop-reason').textContent = cropInfo.reason; }
+function markManualCrop() { delete crop.masks; cropInfo = { confidence: 'manual', reason: 'Recadrage choisi manuellement.' }; $('crop-reason').textContent = cropInfo.reason; }
 function resetCrop() { crop = { x: 0, y: 0, w: video.videoWidth, h: video.videoHeight }; markManualCrop(); drawCrop(); }
 $('reset-crop').onclick = resetCrop; $('no-crop').onclick = resetCrop;
 $('full-width').onclick = () => { crop.x = 0; crop.w = video.videoWidth; markManualCrop(); drawCrop(); };
@@ -272,7 +282,7 @@ async function runAnalysis(signal) {
   try {
     analysisReport = await analyzeVideo(video, crop, settings, signal,
       (percent, count, phase, extra) => { $('progress-title').textContent = phase; $('progress').value = percent; $('progress-text').textContent = `${percent} % · ${count} pages retenues${extra ? ` · ${extra}` : ''}`; }, acceptPage,
-      { cropConfidence: cropInfo?.confidence, onDuplicate: item => duplicates.push(item), onFinish: report => { analysisReport = report; } });
+      { cropConfidence: cropInfo?.confidence, onReplace: replacePage, onDuplicate: item => duplicates.push(item), onFinish: report => { analysisReport = report; } });
     message(pages.length ? `${pages.length} pages retenues ; ${duplicates.length} doublons écartés. Touchez une page pour vérifier sa netteté et son cadrage.` : 'Aucune image assez stable n’a été confirmée. Vérifiez le cadrage ou ajoutez les pages manuellement.');
   } finally { stage = 4; }
 }

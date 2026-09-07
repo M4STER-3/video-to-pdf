@@ -8,6 +8,8 @@ export function inferCrop(frames, originalWidth, originalHeight) {
   if (frames.length < 3) return { crop: full, confidence: 'low', reason: 'Pas assez d’images pour déterminer les marges.' };
   const { width: w, height: h } = frames[0];
   if (frames.some(f => f.width !== w || f.height !== h)) return { crop: full, confidence: 'low', reason: 'La disposition change pendant la vidéo.' };
+  const paper = inferPaperFrame(frames, originalWidth, originalHeight);
+  if (paper) return paper;
   function boundary(frame, axis, p, from, to) {
     const data = frame.gray, values = []; let strong = 0;
     for (let q = from; q < to; q++) {
@@ -66,49 +68,7 @@ export function inferCrop(frames, originalWidth, originalHeight) {
   if (outsideMoves('y', top, 'start')) top = null;
   if (outsideMoves('y', bottom, 'end')) bottom = null;
   let found = [left, right, top, bottom].filter(Boolean).length;
-  if (!found && frames.length >= 5) {
-    // Some tablets render a soft shadow beside the document. The strict
-    // multi-gap test above intentionally rejects that shadow; recover only
-    // when a broad, persistent luminance step confirms all four sides.
-    const median = (axis, from, to) => {
-      const length = axis === 'x' ? w : h, profiles = [];
-      for (const frame of frames) {
-        const values = [];
-        for (let p = 0; p < length; p++) {
-          let sum = 0, n = 0;
-          for (let q = from; q < to; q += 2) {
-            sum += axis === 'x' ? frame.gray[q * w + p] : frame.gray[p * w + q]; n++;
-          }
-          values.push(sum / Math.max(1, n));
-        }
-        profiles.push(values);
-      }
-      return Array.from({ length }, (_, p) => quantile(profiles.map(profile => profile[p]), 0.5));
-    };
-    const edgeFromProfile = (axis, side, from, to, minimumContrast = 18) => {
-      const length = axis === 'x' ? w : h, profile = median(axis, from, to), start = side === 'start' ? 8 : Math.floor(length * 0.62), end = side === 'start' ? Math.floor(length * 0.38) : length - 8;
-      let best = null;
-      for (let p = start; p < end; p++) {
-        const before = profile.slice(Math.max(0, p - 4), p), after = profile.slice(p, Math.min(length, p + 4));
-        const a = before.reduce((sum, value) => sum + value, 0) / Math.max(1, before.length), b = after.reduce((sum, value) => sum + value, 0) / Math.max(1, after.length), contrast = Math.abs(a - b);
-        if (!best || contrast > best.contrast) best = { p, contrast };
-      }
-      return best && best.contrast >= minimumContrast ? best : null;
-    };
-    const robustLeft = edgeFromProfile('x', 'start', Math.floor(h * 0.16), Math.ceil(h * 0.84));
-    const robustRight = edgeFromProfile('x', 'end', Math.floor(h * 0.16), Math.ceil(h * 0.84));
-    const robustTop = edgeFromProfile('y', 'start', robustLeft?.p ?? Math.floor(w * 0.08), robustRight?.p ?? Math.ceil(w * 0.92));
-    if (robustLeft && robustRight) {
-      left = { p: robustLeft.p, score: robustLeft.contrast / 255, support: 1 };
-      right = { p: robustRight.p, score: robustRight.contrast / 255, support: 1 };
-      if (robustTop) top = { p: robustTop.p, score: robustTop.contrast / 255, support: 1 };
-      // Bottom chrome often contains a home indicator with a stronger edge
-      // than the actual page. Keep that side uncropped unless the strict
-      // detector already proved it safe.
-      found = [left, right, top, bottom].filter(Boolean).length;
-    }
-  }
-  if (!found && !(left && right && top && bottom)) return { crop: full, confidence: 'low', reason: 'Bords incertains : l’image entière est conservée pour éviter de couper du contenu.' };
+  if (!found) return { crop: full, confidence: 'low', reason: 'Bords incertains : l’image entière est conservée pour éviter de couper du contenu.' };
   // Keep a safety margin inside the excluded UI, outside the document boundary.
   const x = left ? Math.max(0, left.p - 3) : 0, y = top ? Math.max(0, top.p - 3) : 0;
   const endX = right ? Math.min(w, right.p + 3) : w, endY = bottom ? Math.min(h, bottom.p + 3) : h;
@@ -131,4 +91,88 @@ export async function detectAutoCrop(video, signal, onProgress = () => {}) {
     }
     return inferCrop(frames, video.videoWidth, video.videoHeight);
   } finally { sampler.dispose(); }
+}
+
+// A sheet shadow is a thin trough, unlike a background step. Require a pair
+// of long sides, flat exterior strips and two independently observed ends.
+// The aspect ratio is measured from those edges, never imposed as A4.
+export function inferPaperFrame(frames, originalWidth, originalHeight) {
+  if (frames.length < 5) return null;
+  const { width: w, height: h } = frames[0];
+  const median = new Uint8Array(w * h);
+  for (let i = 0; i < median.length; i++) median[i] = quantile(frames.map(f => f.gray[i]), 0.5);
+  function lines(axis, side, from, to) {
+    const length = axis === 'x' ? w : h, result = [];
+    const start = side === 'start' ? 4 : Math.floor(length * 0.62);
+    const end = side === 'start' ? Math.ceil(length * 0.38) : length - 4;
+    const pixel = (p, q) => median[axis === 'x' ? q * w + p : p * w + q];
+    for (let p = start; p < end; p++) {
+      let strong = 0, flat = 0, count = 0, strength = 0;
+      for (let q = from; q < to; q++) {
+        const trough = Math.min(pixel(p - 2, q), pixel(p + 2, q)) - pixel(p, q);
+        if (trough >= 10) { strong++; strength += trough; }
+        const outside = side === 'start' ? p - 4 : p + 4;
+        const further = side === 'start' ? Math.max(0, p - 8) : Math.min(length - 1, p + 8);
+        if (Math.abs(pixel(outside, q) - pixel(further, q)) <= 8) flat++;
+        count++;
+      }
+      if (strong / count >= 0.65 && flat / count >= 0.85) result.push({ p, score: strength / count });
+    }
+    return result;
+  }
+  const lefts = lines('x', 'start', Math.floor(h * 0.2), Math.ceil(h * 0.8));
+  const rights = lines('x', 'end', Math.floor(h * 0.2), Math.ceil(h * 0.8));
+  if (!lefts.length || !rights.length) return null;
+  const left = lefts.sort((a, b) => b.score - a.score)[0].p;
+  const right = rights.sort((a, b) => b.score - a.score)[0].p;
+  if (right - left < w * 0.3) return null;
+  const tops = lines('y', 'start', left + 3, right - 3);
+  const bottoms = lines('y', 'end', left + 3, right - 3);
+  if (!tops.length || !bottoms.length) return null;
+  const top = Math.min(...tops.map(x => x.p)), bottom = Math.max(...bottoms.map(x => x.p));
+  const x = Math.max(0, left - 1), endX = Math.min(w, right + 1);
+  const y = top + 1, endY = bottom;
+  const ratio = (endX - x) / (endY - y), area = (endX - x) * (endY - y) / (w * h);
+  if (ratio < 0.5 || ratio > 2 || area < 0.2 || area > 0.96) return null;
+  const sx = originalWidth / w, sy = originalHeight / h;
+  const crop = { x: Math.round(x * sx), y: Math.round(y * sy), w: Math.round((endX - x) * sx), h: Math.round((endY - y) * sy) };
+  const badge = findViewerBadge(frames, median, w, h, x, y, endX, endY);
+  if (badge) crop.masks = [{ x: Math.round((badge.x - x) * sx), y: Math.round((badge.y - y) * sy), w: Math.round(badge.w * sx), h: Math.round(badge.h * sy) }];
+  return { crop, confidence: 'high', reason: 'Feuille entière : les quatre limites sont détectées, proportions originales conservées.' };
+}
+
+// Only remove a persistent, filled grey viewer badge surrounded by blank
+// white paper. Bare page numbers, footnotes and nonuniform footers survive.
+function findViewerBadge(frames, median, w, h, left, top, right, bottom) {
+  const pw = right - left, ph = bottom - top;
+  const x0 = Math.floor(left + pw * 0.4), x1 = Math.ceil(right - pw * 0.4);
+  const y0 = Math.floor(bottom - ph * 0.035), y1 = bottom - 1;
+  const seen = new Set(), components = [];
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const start = y * w + x;
+    if (seen.has(start) || median[start] > 244) continue;
+    const queue = [start]; seen.add(start); let minX = x, maxX = x, minY = y, maxY = y;
+    for (let q = 0; q < queue.length; q++) {
+      const i = queue[q], xx = i % w, yy = Math.floor(i / w);
+      minX = Math.min(minX, xx); maxX = Math.max(maxX, xx); minY = Math.min(minY, yy); maxY = Math.max(maxY, yy);
+      for (const [nx, ny] of [[xx - 1, yy], [xx + 1, yy], [xx, yy - 1], [xx, yy + 1]]) {
+        const j = ny * w + nx;
+        if (nx >= x0 && nx < x1 && ny >= y0 && ny < y1 && !seen.has(j) && median[j] <= 244) { seen.add(j); queue.push(j); }
+      }
+    }
+    const bw = maxX - minX + 1, bh = maxY - minY + 1;
+    if (bw < 4 || bw > pw * 0.13 || bh < 2 || bh > ph * 0.035 || bw / bh < 1.4 || bw / bh > 5) continue;
+    let support = 0;
+    for (const frame of frames) {
+      let grey = 0, white = 0, ring = 0;
+      for (let yy = minY; yy <= maxY; yy++) for (let xx = minX; xx <= maxX; xx++) { const value = frame.gray[yy * w + xx]; if (value >= 180 && value <= 244) grey++; }
+      for (let yy = minY - 1; yy <= maxY + 1; yy++) for (let xx = minX - 2; xx <= maxX + 2; xx++) {
+        if (yy >= minY && yy <= maxY && xx >= minX - 1 && xx <= maxX + 1) continue;
+        ring++; if (frame.gray[yy * w + xx] >= 248) white++;
+      }
+      if (grey / (bw * bh) >= 0.65 && white / ring >= 0.85) support++;
+    }
+    if (support >= 5 && support / frames.length >= 0.6) components.push({ x: minX - 2, y: minY - 1, w: bw + 4, h: bh + 2 });
+  }
+  return components.length === 1 ? components[0] : null;
 }

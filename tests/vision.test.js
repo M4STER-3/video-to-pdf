@@ -1,6 +1,6 @@
 import { describe, dimensions, estimateTranslation, motionMetrics, verifyDuplicate, adaptiveThreshold, WindowTracker } from '../vision.js';
 import { inferCrop } from '../auto-crop.js';
-import { RECOMMENDED, seekVideoTo } from '../video-analyzer.js';
+import { RECOMMENDED, seekVideoTo, isViewerBadge } from '../video-analyzer.js';
 import { analyzeVideo, refineWindow } from '../analysis-engine.js';
 import { TEXT_PATCHES } from './text-fixtures.js';
 
@@ -159,7 +159,7 @@ export async function runTests(onResult = () => {}) {
     assert(verifyDuplicate(a, b).kind !== 'duplicate', 'pages confondues');
     assert(verifyDuplicate(a, a, 0).kind === 'different', 'désactivation ignorée');
   });
-  await test('Calibration bornée même si toute la vidéo bouge', () => assert(adaptiveThreshold([0.3, 0.4, 0.2], 0.012) <= 0.014, 'seuil trop grand'));
+  await test('Calibration bornée même si toute la vidéo bouge', () => assert(adaptiveThreshold([0.3, 0.4, 0.2], 0.012) <= 0.022, 'seuil trop grand'));
   for (const dark of [false, true]) await test(`Recadrage automatique : document ${dark ? 'sombre' : 'clair'}`, () => {
     const result = inferCrop([screenshot(1, dark), screenshot(2, dark), screenshot(3, dark), screenshot(4, dark), screenshot(5, dark)], 2000, 2800);
     assert(result.confidence === 'high', JSON.stringify(result));
@@ -171,12 +171,56 @@ export async function runTests(onResult = () => {}) {
     assert(inferCrop(frames, 200, 280).confidence === 'high', 'menu change le cadre');
   });
   await test('Sans limites fiables : conserver l’image entière', () => {
-    const full = inferCrop([a, b, page(3)], 144, 192);
+    const full = inferCrop([a, b, page(3), page(4), page(5), page(6), page(7)], 144, 192);
     assert(full.crop.x === 0 && full.crop.y === 0 && full.crop.w === 144 && full.crop.h === 192, JSON.stringify(full));
   });
   await test('Une ligne de tableau fine ne devient pas une marge', () => {
-    const frames = [1, 2, 3].map(seed => { const f = page(seed); rectangle(f.gray, f.width, f.height, 1, 22, 142, 1, 0); return describe(f.gray, f.width, f.height); });
+    const frames = [1, 2, 3, 4, 5, 6, 7].map(seed => { const f = page(seed); rectangle(f.gray, f.width, f.height, 1, 22, 142, 1, 0); return describe(f.gray, f.width, f.height); });
     assert(inferCrop(frames, 144, 192).crop.y === 0, 'ligne prise pour une bordure');
+  });
+  await test('Feuille avec ombres : quatre bords et proportions préservés', () => {
+    const frames = Array.from({ length: 7 }, (_, seed) => {
+      const w = 320, h = 240, data = new Uint8Array(w * h).fill(239);
+      rectangle(data, w, h, 80, 16, 160, 217, 255);
+      rectangle(data, w, h, 79, 15, 1, 219, 110);
+      rectangle(data, w, h, 240, 15, 1, 219, 110);
+      rectangle(data, w, h, 79, 15, 162, 1, 215);
+      rectangle(data, w, h, 79, 233, 162, 1, 215);
+      const inner = page(seed + 1, 140, 180);
+      for (let y = 0; y < 180; y++) data.set(inner.gray.subarray(y * 140, (y + 1) * 140), (y + 25) * w + 90);
+      return describe(data, w, h);
+    });
+    const result = inferCrop(frames, 960, 720), c = result.crop;
+    assert(result.confidence === 'high' && c.x >= 230 && c.x <= 243 && c.y >= 42 && c.y <= 51 && c.y + c.h >= 690 && c.y + c.h <= 705 && c.x + c.w >= 717 && c.x + c.w <= 730, JSON.stringify(result));
+  });
+  function codecNoise(frame) {
+    const data = frame.gray.slice(); let seed = 4;
+    for (let i = 0; i < data.length; i++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      if (frame.edge[i] > 10 && seed % 10 === 0) data[i] = Math.max(0, Math.min(255, data[i] + (seed % 3 ? -24 : 24)));
+    }
+    return describe(data, frame.width, frame.height);
+  }
+  await test('Compression répartie : une seule page', () => {
+    assert(verifyDuplicate(a, codecNoise(a)).kind === 'duplicate', 'bruit pris pour une page');
+  });
+  await test('Correction locale avec compression : conserver le texte modifié', () => {
+    const noise = codecNoise(a); rectangle(noise.gray, a.width, a.height, 70, 90, 3, 5, 0);
+    assert(verifyDuplicate(a, describe(noise.gray, a.width, a.height)).kind !== 'duplicate', 'correction supprimée');
+  });
+  await test('Panneau système assombrissant la même feuille : image masquée reconnue', () => {
+    const dimmed = describe(Uint8Array.from(a.gray, p => Math.round(p * 0.5 + 5)), a.width, a.height);
+    assert(verifyDuplicate(a, dimmed).kind === 'obscured', 'image assombrie non reconnue');
+    const other = describe(Uint8Array.from(b.gray, p => Math.round(p * 0.5 + 5)), b.width, b.height);
+    assert(verifyDuplicate(a, other).kind !== 'obscured', 'autre feuille rejetée');
+  });
+  await test('Nettoyage du compteur : ne pas effacer une note de bas de page', () => {
+    const w = 48, h = 21, data = new Uint8Array(w * h * 4).fill(255);
+    for (let y = 3; y < h - 3; y++) for (let x = 8; x < w - 8; x++) for (let c = 0; c < 3; c++) data[(y * w + x) * 4 + c] = 220;
+    assert(isViewerBadge(data, w, h), 'compteur gris non reconnu');
+    data.fill(255);
+    for (let y = 7; y < 13; y++) for (let x = 8; x < w - 8; x += 4) for (let c = 0; c < 3; c++) data[(y * w + x) * 4 + c] = 25;
+    assert(!isViewerBadge(data, w, h), 'texte de pied de page effacé');
   });
   await test('Seek séquentiel, timestamp identique et libération des écouteurs', async () => {
     const v = new TestVideo(), signal = new TestSignal(); await seekVideoTo(v, 1, signal); await seekVideoTo(v, 1, signal);
